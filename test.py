@@ -1,39 +1,48 @@
 from ultralytics import YOLO
+from tkinter import Tk, filedialog
 import cv2
 
-# Tải mô hình YOLO
-model = YOLO("best.pt")
+# Hide Tkinter main window
+root = Tk()
+root.withdraw()
 
-# ---- CHỌN NGUỒN NHẬN DIỆN ----
-# source = "0" -> webcam
-# source = "path/to/image.jpg" -> ảnh
-# source = "path/to/video.mp4" -> video
-source = 0  # dùng webcam, đổi nếu muốn test ảnh
+# Choose an image file
+file_path = filedialog.askopenfilename(
+    title="Select an image",
+    filetypes=[("Image files", "*.jpg *.jpeg *.png *.bmp *.webp")]
+)
 
-# Mở webcam hoặc đọc file
-cap = cv2.VideoCapture(source)
+if not file_path:
+    print("No image selected. Exiting.")
+else:
+    print(f"Selected image: {file_path}")
 
-if not cap.isOpened():
-    print("❌ Không mở được nguồn video/ảnh.")
-    exit()
+    # Load model
+    model = YOLO("final.pt")
 
-while True:
-    ret, frame = cap.read()
-    if not ret:
-        break
+    # Predict (no auto-close)
+    results = model.predict(source=file_path, conf=0.3, show=False)
 
-    # Dự đoán bằng YOLO
-    results = model(frame)
+    # Show detected image manually
+    for result in results:
+        annotated_frame = result.plot()  # Draw boxes and labels
+        cv2.imshow("Detection Result - Press ESC to close", annotated_frame)
 
-    # Vẽ kết quả lên ảnh
-    annotated_frame = results[0].plot()
+        print("\nDetected objects:")
 
-    # Hiển thị
-    cv2.imshow("🍜 Food Detection", annotated_frame)
+        if result.boxes is None or len(result.boxes) == 0:
+            print(" - No objects detected.")
+        else:
+            for box in result.boxes:
+                cls_id = int(box.cls[0])
+                label = model.names[cls_id]
+                conf = float(box.conf[0])
+                print(f" - {label} ({conf:.2f})")
 
-    # Nhấn 'q' để thoát
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+        # Wait until ESC pressed
+        while True:
+            key = cv2.waitKey(10)
+            if key == 27:  # ESC key
+                break
 
-cap.release()
-cv2.destroyAllWindows()
+    cv2.destroyAllWindows()
